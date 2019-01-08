@@ -2,6 +2,9 @@ package keybindings
 
 import (
 	"fmt"
+	"io/ioutil"
+	"log"
+	"os"
 	"strings"
 
 	"github.com/atotto/clipboard"
@@ -144,6 +147,68 @@ func (h HelpHandler) Fn() func(g *gocui.Gui, v *gocui.View) error {
 }
 
 ////////////////////////////////////////////////////////////////////
+
+
+////////////////////////////////////////////////////////////////////
+type EditHandler struct {
+	GlobalHandler
+	Content   *views.ItemWidget
+	StatusBar *views.StatusbarWidget
+}
+
+func NewEditHandler(content *views.ItemWidget, statusbar *views.StatusbarWidget) *CopyHandler {
+	handler := &CopyHandler{
+		Content:   content,
+		StatusBar: statusbar,
+	}
+	handler.Index = 24
+	return handler
+}
+
+func (h EditHandler) Fn() func(g *gocui.Gui, v *gocui.View) error {
+	return func(g *gocui.Gui, v *gocui.View) error {
+		tmpFile, err := ioutil.TempFile(os.TempDir(), "azbrowse-")
+		if err != nil {
+			log.Panicln("Cannot create temporary file", err)
+		}
+
+		err = tmpFile.Close()
+		if err != nil {
+			log.Panicln("Cannot close temporary file", err)
+		}
+
+		newFilename := tmpFile.Name() + ".json"
+		err = os.Rename(tmpFile.Name(), newFilename)
+		if err != nil {
+			log.Panicln("Cannot rename temporary file", err)
+		}
+
+		tmpFile, err = os.OpenFile(newFilename, os.O_RDWR, 0)
+		if err != nil {
+			log.Panicln("Cannot open renamed temporary file", err)
+		}
+
+		// Remember to clean up the file afterwards
+		// defer os.Remove(newFilename)
+
+		clipboard.WriteAll(h.Content.GetContent())
+
+		tmpFile.WriteString(h.Content.GetContent())
+		tmpFile.Close()
+
+		h.StatusBar.Status("Opening JSON in editor...", false)
+		err = OpenEditor(tmpFile.Name())
+		if err != nil {
+			log.Panicln("Cannot open editor", err)
+		}
+		h.StatusBar.Status("Opened JSON in editor", false)
+
+		return nil
+	}
+}
+
+////////////////////////////////////////////////////////////////////
+
 
 ////////////////////////////////////////////////////////////////////
 type ConfirmDeleteHandler struct {
