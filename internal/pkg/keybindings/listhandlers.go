@@ -430,7 +430,11 @@ func (h ListUpdateHandler) Fn() func(g *gocui.Gui, v *gocui.View) error {
 			return nil
 		}
 
-		tmpFile, err := ioutil.TempFile(os.TempDir(), "azbrowse-*.json")
+		tempDir := os.Getenv("AZBROWSE_TEMPDIR")
+		if tempDir == "" {
+			tempDir = os.TempDir()
+		}
+		tmpFile, err := ioutil.TempFile(tempDir, "azbrowse-*.json")
 		if err != nil {
 			h.status.Status(fmt.Sprintf("Cannot create temporary file: %s", err), false)
 			return err
