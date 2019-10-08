@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"gopkg.in/yaml.v2"
+
 	"github.com/lawrencegripper/azbrowse/pkg/armclient"
 )
 
@@ -15,6 +17,16 @@ type clusterCredentialsResponse struct {
 		Name  string `json:"name"`
 		Value string `json:"Value"`
 	} `json:"kubeconfigs"`
+}
+
+// kubeConfig is a minimal struct for parsing the parts of the response that we care about
+type kubeConfig struct {
+	Users []struct {
+		Name string `yaml:"name"`
+		User struct {
+			Token string `yaml:"token"`
+		} `yaml:"user"`
+	} `yaml:"users"`
 }
 
 // AzureKubernetesServiceExpander expands the kubernetes aspects of AKS
@@ -50,7 +62,7 @@ func (e *AzureKubernetesServiceExpander) Expand(ctx context.Context, currentItem
 		swaggerResourceType.Endpoint.TemplateURL == "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.ContainerService/managedClusters/{resourceName}" {
 		newItems := []*TreeNode{}
 		newItems = append(newItems, &TreeNode{
-			ID: currentItem.ID + "/<k8sapi>",
+			ID:        currentItem.ID + "/<k8sapi>",
 			Parentid:  currentItem.ID,
 			Namespace: "AzureKubernetesService",
 			Name:      "Kubernetes API",
@@ -88,7 +100,7 @@ func (e *AzureKubernetesServiceExpander) expandKubernetesApiRoot(ctx context.Con
 
 	clusterID := currentItem.Metadata["ClusterID"]
 
-	foo, err := e.getLoginDetails(ctx, clusterID)
+	token, err := e.getClusterToken(ctx, clusterID)
 	if err != nil {
 		return ExpanderResult{
 			Err:               err,
@@ -100,14 +112,14 @@ func (e *AzureKubernetesServiceExpander) expandKubernetesApiRoot(ctx context.Con
 	newItems := []*TreeNode{}
 	return ExpanderResult{
 		Err:               nil,
-		Response:          foo,
+		Response:          token,
 		SourceDescription: "AzureKubernetesServiceExpander request",
 		Nodes:             newItems,
 		IsPrimaryResponse: true,
 	}
 }
 
-func (e *AzureKubernetesServiceExpander) getLoginDetails(ctx context.Context, clusterID string) (string, error) {
+func (e *AzureKubernetesServiceExpander) getClusterToken(ctx context.Context, clusterID string) (string, error) {
 
 	data, err := armclient.DoRequest(ctx, "POST", clusterID+"/listClusterAdminCredential?api-version=2019-08-01")
 	if err != nil {
@@ -134,5 +146,12 @@ func (e *AzureKubernetesServiceExpander) getLoginDetails(ctx context.Context, cl
 		return "", err
 	}
 
-	return string(config), nil
+	var kubeConfig kubeConfig
+	err = yaml.Unmarshal(config, &kubeConfig)
+	if err != nil {
+		err = fmt.Errorf("Error parsing kubeconfig: %s\nURL:%s", err, clusterID)
+		return "", err
+	}
+
+	return kubeConfig.Users[0].User.Token, nil
 }
