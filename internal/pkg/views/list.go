@@ -247,7 +247,13 @@ func (w *ListWidget) Navigate(nodes []*expanders.TreeNode, content *expanders.Ex
 		w.SetNodes(nodes)
 	}
 	w.expandedNodeItem = currentItem
-	w.contentView.SetContent(content.Response, content.ResponseType, title)
+	contentResponseType := expanders.ResponsePlainText
+	contentResponse := ""
+	if content != nil {
+		contentResponse = content.Response
+		contentResponseType = content.ResponseType
+	}
+	w.contentView.SetContent(contentResponse, contentResponseType, title)
 	if currentItem != nil {
 		w.title = w.title + ">" + currentItem.Name
 	}
