@@ -276,6 +276,8 @@ func setupViewsAndKeybindings(ctx context.Context, g *gocui.Gui, settings *Setti
 }
 
 func automatedFuzzer(list *views.ListWidget, settings *Settings, gui *gocui.Gui) {
+	visitedNodes := map[string]int{}
+
 	startTime := time.Now()
 	endTime := startTime.Add(time.Duration(settings.FuzzerDurationMinutes) * time.Minute)
 	go func() {
@@ -285,6 +287,7 @@ func automatedFuzzer(list *views.ListWidget, settings *Settings, gui *gocui.Gui)
 			navigateStateInterface := <-navigatedChannel
 			if time.Now().After(endTime) {
 				gui.Close()
+				outputVisitedNodes(visitedNodes)
 				os.Exit(0)
 			}
 			navigateState := navigateStateInterface.(views.ListNavigatedEventState)
@@ -305,10 +308,45 @@ func automatedFuzzer(list *views.ListWidget, settings *Settings, gui *gocui.Gui)
 			if len(nodeList) > 0 {
 				list.ChangeSelection(rand.Intn(len(nodeList)))
 				list.ExpandCurrentSelection()
+				currentNodeID := list.CurrentExpandedItem().ID
+				visitedNodes[currentNodeID] = visitedNodes[currentNodeID] + 1
 				depthCount++
 			}
 		}
 	}()
+}
+
+type visitedNode struct{
+	ID string
+	Count int
+}
+type byCount []visitedNode
+func (s byCount) Len() int {
+	return len(s)
+}
+func (s byCount) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+func (s byCount) Less(i, j int) bool {
+	return s[i].Count < s[j].Count
+}
+
+func outputVisitedNodes(visitedNodeMap map[string]int){
+	fmt.Printf("Fuzzer visited %d nodes\n\n", len(visitedNodeMap))
+
+
+	visitedNodes := []visitedNode{}
+
+	for nodeID, count := range visitedNodeMap {
+		visitedNodes = append(visitedNodes, visitedNode{ID: nodeID, Count: count})
+	}
+	sort.Sort(byCount(visitedNodes))
+
+	for index := len(visitedNodes)-1; index >=0 ; index-- {
+		node := visitedNodes[index]
+		fmt.Printf("%d\t%s\n", node.Count, node.ID)
+	}
+
 }
 
 func handleNavigateTo(list *views.ListWidget, settings *Settings) {
