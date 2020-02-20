@@ -13,6 +13,8 @@ import (
 	"github.com/go-openapi/loads"
 	"github.com/go-openapi/spec"
 	"github.com/lawrencegripper/azbrowse/pkg/swagger"
+
+	yaml "gopkg.in/yaml.v2"
 )
 
 // The input folder structure is as below
@@ -104,12 +106,21 @@ func loadARMSwagger(config *swagger.Config) []*swagger.Path {
 	return paths
 }
 
-func getVersionsForFolder(readmePath string) ([]string, error) {
-	results := []string{}
+// TODO - move some of this to the swagger helpers
+type apiVersion struct {
+	Name  string
+	Files []string
+}
+type specVersion struct {
+	InputFiles []string `yaml:"input-file"`
+}
+
+func getVersionsForFolder(readmePath string) ([]apiVersion, error) {
+	results := []apiVersion{}
 
 	buf, err := ioutil.ReadFile(readmePath)
 	if err != nil {
-		return results, err
+		return []apiVersion{}, err
 	}
 	content := string(buf)
 
@@ -120,8 +131,22 @@ func getVersionsForFolder(readmePath string) ([]string, error) {
 	for _, match := range matches {
 		// indices 0 & 1 give the start/end of the match
 		// indices 2 & 3 give the start/end of the capture
-		version := content[match[2]:match[3]]
-		if version != "all-api-versions" {
+		versionString := content[match[2]:match[3]]
+		if versionString != "all-api-versions" {
+			yamlStartIndex := match[1] + 1
+			offset := strings.Index(content[yamlStartIndex:], "```")
+			yamlSnippet := content[yamlStartIndex : yamlStartIndex+offset]
+
+			var v specVersion
+			err := yaml.Unmarshal([]byte(yamlSnippet), &v)
+			if err != nil {
+				return []apiVersion{}, err
+			}
+
+			version := apiVersion{
+				Name:  versionString,
+				Files: v.InputFiles,
+			}
 			results = append(results, version)
 		}
 	}
