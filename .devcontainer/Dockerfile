@@ -82,3 +82,5 @@ RUN \
     # --> Go releaser 
     && curl -sfL https://install.goreleaser.com/github.com/goreleaser/goreleaser.sh | sh -s -- "v0.123.3"\
     && rm -rf /go/src/ && rm -rf /go/pkg
+
+RUN apt-get update && apt-get install bash-completion 
