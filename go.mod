@@ -10,7 +10,7 @@ require (
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/boltdb/bolt v1.3.1
 	github.com/cskr/pubsub v1.0.1
-	github.com/fatih/color v1.7.0
+	github.com/fatih/color v1.9.0
 	github.com/globalsign/mgo v0.0.0-20181015135952-eeefdecb41b8 // indirect
 	github.com/go-openapi/analysis v0.18.0 // indirect
 	github.com/go-openapi/errors v0.18.0 // indirect
@@ -23,11 +23,13 @@ require (
 	github.com/guptarohit/asciigraph v0.4.2-0.20190112130928-1bc9b2452856
 	github.com/hokaccha/go-prettyjson v0.0.0-20180920040306-f579f869bbfe // indirect
 	github.com/mailru/easyjson v0.0.0-20190221075403-6243d8e04c3f // indirect
+	github.com/mattn/go-isatty v0.0.12 // indirect
 	github.com/mattn/go-runewidth v0.0.3 // indirect
 	github.com/nbio/st v0.0.0-20140626010706-e9e8d9816f32
 	github.com/nsf/termbox-go v0.0.0-20181027232701-60ab7e3d12ed
 	github.com/opentracing/basictracer-go v1.0.0 // indirect
 	github.com/opentracing/opentracing-go v1.0.2
+	github.com/rakyll/gotest v0.0.0-20200206190159-3023d5d6366c // indirect
 	github.com/rhysd/go-github-selfupdate v1.1.0
 	github.com/satori/go.uuid v1.2.0
 	github.com/shurcooL/httpfs v0.0.0-20181222201310-74dc9339e414 // indirect
@@ -38,6 +40,7 @@ require (
 	github.com/stuartleeks/gocui v0.4.1
 	github.com/valyala/fastjson v1.4.0
 	golang.org/x/oauth2 v0.0.0-20181203162652-d668ce993890 // indirect
+	golang.org/x/sys v0.0.0-20200219091948-cb0a6d8edb6c // indirect
 	golang.org/x/tools v0.0.0-20190405180640-052fc3cfdbc2 // indirect
 	gopkg.in/h2non/gock.v1 v1.0.15
 	gopkg.in/yaml.v2 v2.2.4

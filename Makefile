@@ -15,12 +15,12 @@ help : Makefile
 ## test:
 ## 		Run quick executing unit tests
 test:
-	GO111MODULE=on go test -p 1 -v -count=1 -short ./...
+	GO111MODULE=on gotest -p 1 -v -count=1 -short ./...
 
 ## integration: 
 ##		Run integration and unit tests
 integration:
-	GO111MODULE=on go test -v -count=1 ./...
+	GO111MODULE=on gotest -v -count=1 ./...
 
 ## checks:
 ##		Check/lint code
