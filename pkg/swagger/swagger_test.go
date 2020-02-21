@@ -10,6 +10,52 @@ import (
 	"github.com/go-openapi/loads"
 )
 
+func Test_getVersionsForFolder_FileDoesNotExist_ReturnsError(t *testing.T) {
+
+	_, err := GetVersionsFromAutoRestReadme("./testdata/file_does_not_exist.md")
+
+	assert.Assert(t, is.ErrorContains(err, "no such file or directory"))
+}
+
+func Test_getVersionsForFolder_InvalidFile_ReturnsEmptyResult(t *testing.T) {
+
+	result, err := GetVersionsFromAutoRestReadme("./testdata/invalid_file_format.md")
+
+	assert.Assert(t, is.Nil(err))
+	assert.Assert(t, is.Len(result, 0))
+}
+
+func Test_getVersionsForFolder_ValidFile_ReturnsCorrectVersions(t *testing.T) {
+
+	versions, err := GetVersionsFromAutoRestReadme("./testdata/valid_file.md")
+
+	assert.Assert(t, is.Nil(err))
+	assert.Assert(t, is.Len(versions, 4))
+
+	version := versions[0]
+	assert.Assert(t, is.Equal(version.Name, "package-2019-12-preview"))
+	assert.Assert(t, is.Equal(len(version.Files), 1))
+	assert.Assert(t, is.Equal(version.Files[0], "Microsoft.ContainerRegistry/preview/2019-12-01-preview/containerregistry.json"))
+
+	version = versions[1]
+	assert.Assert(t, is.Equal(version.Name, "package-2019-06-preview"))
+	assert.Assert(t, is.Equal(len(version.Files), 3))
+	assert.Assert(t, is.Equal(version.Files[0], "Microsoft.ContainerRegistry/stable/2019-05-01/containerregistry.json"))
+	assert.Assert(t, is.Equal(version.Files[1], "Microsoft.ContainerRegistry/preview/2019-06-01-preview/containerregistry_build.json"))
+	assert.Assert(t, is.Equal(version.Files[2], "Microsoft.ContainerRegistry/preview/2019-05-01-preview/containerregistry_scopemap.json"))
+
+	version = versions[2]
+	assert.Assert(t, is.Equal(version.Name, "package-2019-06-preview-only"))
+	assert.Assert(t, is.Equal(len(version.Files), 1))
+	assert.Assert(t, is.Equal(version.Files[0], "Microsoft.ContainerRegistry/preview/2019-06-01-preview/containerregistry_build.json"))
+
+	version = versions[3]
+	assert.Assert(t, is.Equal(version.Name, "package-2019-05"))
+	assert.Assert(t, is.Equal(len(version.Files), 2))
+	assert.Assert(t, is.Equal(version.Files[0], "Microsoft.ContainerRegistry/stable/2019-05-01/containerregistry.json"))
+	assert.Assert(t, is.Equal(version.Files[1], "Microsoft.ContainerRegistry/stable/2019-04-01/containerregistry_build.json"))
+}
+
 func Test_Simple_PreOrderedSpec(t *testing.T) {
 
 	// Test a simple hierarchy that is preordered

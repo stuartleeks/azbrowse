@@ -2,6 +2,7 @@ package swagger
 
 import (
 	"fmt"
+	"io/ioutil"
 	"regexp"
 	"sort"
 	"strings"
@@ -9,7 +10,61 @@ import (
 	"github.com/go-openapi/loads"
 	"github.com/go-openapi/spec"
 	"github.com/lawrencegripper/azbrowse/pkg/endpoints"
+	"gopkg.in/yaml.v2"
 )
+
+// APIVersion represents an API Version read from the AutoRest format readme.md files
+type APIVersion struct {
+	// Name is the name of the version
+	Name string
+	// Files is the path to the input-files for the API Version
+	Files []string
+}
+
+// specVersion is used for parsing the yaml snippets in the AutoRest format readme.md files
+type specVersion struct {
+	InputFiles []string `yaml:"input-file"`
+}
+
+// GetVersionsFromAutoRestReadme returns the version information parsed from an AutoRest formatted readme.md file
+func GetVersionsFromAutoRestReadme(readmePath string) ([]APIVersion, error) {
+	apiVersions := []APIVersion{}
+
+	buf, err := ioutil.ReadFile(readmePath)
+	if err != nil {
+		return []APIVersion{}, err
+	}
+	content := string(buf)
+
+	r := regexp.MustCompile("```\\s?yaml \\$\\(tag\\) == '([a-z0-9\\-]*)'")
+
+	matches := r.FindAllStringSubmatchIndex(content, -1)
+
+	for _, match := range matches {
+		// indices 0 & 1 give the start/end of the match
+		// indices 2 & 3 give the start/end of the capture
+		versionString := content[match[2]:match[3]]
+		if versionString != "all-api-versions" {
+			yamlStartIndex := match[1] + 1
+			offset := strings.Index(content[yamlStartIndex:], "```")
+			yamlSnippet := content[yamlStartIndex : yamlStartIndex+offset]
+
+			var v specVersion
+			err := yaml.Unmarshal([]byte(yamlSnippet), &v)
+			if err != nil {
+				return []APIVersion{}, err
+			}
+
+			apiVersion := APIVersion{
+				Name:  versionString,
+				Files: v.InputFiles,
+			}
+			apiVersions = append(apiVersions, apiVersion)
+		}
+	}
+
+	return apiVersions, nil
+}
 
 // MergeSwaggerDoc merges api endpoints from the specified swagger doc into the Paths array
 func MergeSwaggerDoc(currentPaths []*Path, config *Config, doc *loads.Document, validateCapturedSegments bool, pathPrefix string) ([]*Path, error) {
