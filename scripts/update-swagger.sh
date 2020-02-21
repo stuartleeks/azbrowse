@@ -16,12 +16,12 @@ echo "*" > swagger-temp/.gitignore
 git clone https://github.com/azure/azure-rest-api-specs swagger-temp/azure-rest-api-specs --depth=1
 ApiRepo="swagger-temp/azure-rest-api-specs"
 
-# Reset the swagger-specs folder in this repo
-rm -rf ./swagger-specs
-mkdir ./swagger-specs
+# # Reset the swagger-specs folder in this repo
+# rm -rf ./swagger-specs
+# mkdir ./swagger-specs
 
-rm -rf ./swagger-temp/azure-rest-api-specs/.git
-cp -r  ./swagger-temp/azure-rest-api-specs/ ./swagger-specs/
+# rm -rf ./swagger-temp/azure-rest-api-specs/.git
+# cp -r  ./swagger-temp/azure-rest-api-specs/ ./swagger-specs/
 
 # #
 # # The `specification` folder in the azure-rest-api-specs repo contains the folder hierarchy for the swagger specs

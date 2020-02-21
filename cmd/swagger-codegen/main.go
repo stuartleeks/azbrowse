@@ -58,14 +58,14 @@ func main() {
 
 func loadARMSwagger(config *swagger.Config) []*swagger.Path {
 	var paths []*swagger.Path
-	serviceFileInfos, err := ioutil.ReadDir("swagger-specs")
+	serviceFileInfos, err := ioutil.ReadDir("swagger-temp/azure-rest-api-specs/specification")
 	if err != nil {
 		panic(err)
 	}
 	for _, serviceFileInfo := range serviceFileInfos {
 		if serviceFileInfo.IsDir() && serviceFileInfo.Name() != "common-types" {
 			fmt.Printf("Processing service folder: %s\n", serviceFileInfo.Name())
-			readmePath := fmt.Sprintf("swagger-specs/%s/resource-manager/readme.md", serviceFileInfo.Name())
+			readmePath := fmt.Sprintf("swagger-temp/azure-rest-api-specs/specification/%s/resource-manager/readme.md", serviceFileInfo.Name())
 			versions, err := swagger.GetVersionsFromAutoRestReadme(readmePath)
 			if err != nil {
 				// Could be just
@@ -82,6 +82,8 @@ func loadARMSwagger(config *swagger.Config) []*swagger.Path {
 			apiPaths := []swagger.Path{}
 
 			for _, inputFile := range version.Files {
+				inputFile = strings.ReplaceAll(inputFile, "\\", "/")
+				inputFile = fmt.Sprintf("swagger-temp/azure-rest-api-specs/specification/%s/resource-manager/%s", serviceFileInfo.Name(), inputFile)
 				doc := loadDoc(inputFile)
 				newPaths, err := swagger.GetPathsFromSwagger(doc, config, "")
 				if err != nil {
