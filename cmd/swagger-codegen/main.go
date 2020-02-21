@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"regexp"
 	"strings"
 	"text/template"
 
@@ -32,7 +33,8 @@ import (
 //          |       |    |- stable (NB - may preview if no stable)
 //          |       |    |    |- 2018-10-01
 //          |       |    |        |- *.json   (want these)
-//          |       |- misc files (e.g. readme)
+//          |       |- readme.md <-- this contains metadata describing the versions and what files are needed for that version
+//          |       |- misc files (e.g. readme.??.md)
 //           ...
 
 func main() {
@@ -45,13 +47,13 @@ func main() {
 	writeOutput(paths, config, "./internal/pkg/expanders/swagger-armspecs.generated.go", "SwaggerAPISetARMResources")
 	fmt.Println()
 
-	fmt.Println("*******************************************")
-	fmt.Println("  Processing Azure Search Data-plane Specs ")
-	fmt.Println("*******************************************")
-	config = getAzureSearchDataPlaneConfig()
-	paths = loadAzureSearchDataPlaneSpecs(config)
-	writeOutput(paths, config, "./internal/pkg/expanders/search.generated.go", "AzureSearchServiceExpander")
-	fmt.Println()
+	// fmt.Println("*******************************************")
+	// fmt.Println("  Processing Azure Search Data-plane Specs ")
+	// fmt.Println("*******************************************")
+	// config = getAzureSearchDataPlaneConfig()
+	// paths = loadAzureSearchDataPlaneSpecs(config)
+	// writeOutput(paths, config, "./internal/pkg/expanders/search.generated.go", "AzureSearchServiceExpander")
+	// fmt.Println()
 
 }
 
@@ -68,6 +70,7 @@ func loadARMSwagger(config *swagger.Config) []*swagger.Path {
 			if err != nil {
 				continue // may just be data-plane folder
 			}
+			_, _ = getVersionsForFolder(fmt.Sprintf("swagger-specs/%s/resource-manager/readme.md", serviceFileInfo.Name()))
 			for _, resourceTypeFileInfo := range resourceTypeFileInfos {
 				if resourceTypeFileInfo.IsDir() && resourceTypeFileInfo.Name() != "common" {
 					swaggerPath := getFirstNonCommonPath(getFirstNonCommonPath(fmt.Sprintf("swagger-specs/%s/resource-manager/%s", serviceFileInfo.Name(), resourceTypeFileInfo.Name())))
@@ -99,6 +102,31 @@ func loadARMSwagger(config *swagger.Config) []*swagger.Path {
 		}
 	}
 	return paths
+}
+
+func getVersionsForFolder(readmePath string) ([]string, error) {
+	results := []string{}
+
+	buf, err := ioutil.ReadFile(readmePath)
+	if err != nil {
+		return results, err
+	}
+	content := string(buf)
+
+	r := regexp.MustCompile("```\\s?yaml \\$\\(tag\\) == '([a-z0-9\\-]*)'")
+
+	matches := r.FindAllStringSubmatchIndex(content, -1)
+
+	for _, match := range matches {
+		// indices 0 & 1 give the start/end of the match
+		// indices 2 & 3 give the start/end of the capture
+		version := content[match[2]:match[3]]
+		if version != "all-api-versions" {
+			results = append(results, version)
+		}
+	}
+
+	return results, nil
 }
 
 // getARMConfig returns the config for ARM Swagger processing
