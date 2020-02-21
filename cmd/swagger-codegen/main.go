@@ -76,8 +76,12 @@ func loadARMSwagger(config *swagger.Config) []*swagger.Path {
 				fmt.Printf("No versions found in '%s'\n", readmePath)
 				continue
 			}
-			// TODO: add logic to determin which version to take!
-			version := versions[0]
+
+			version := pickVersion(versions)
+			if version == nil {
+				fmt.Printf("No versions found in '%s'\n", readmePath)
+				continue
+			}
 
 			apiPaths := []swagger.Path{}
 
@@ -101,6 +105,35 @@ func loadARMSwagger(config *swagger.Config) []*swagger.Path {
 		}
 	}
 	return paths
+}
+
+func pickVersion(versions []swagger.APIVersion) *swagger.APIVersion {
+	if len(versions) == 0 {
+		return nil
+	}
+
+	var latestPreview *swagger.APIVersion
+	var latestNonPreview *swagger.APIVersion
+	for _, version := range versions {
+		version := version // <-- avoid loop variable capture issue
+		if strings.HasSuffix(version.Name, "-preview-only") {
+			continue
+		}
+		if strings.HasSuffix(version.Name, "-preview") {
+			if latestPreview == nil || version.Name > latestPreview.Name {
+				latestPreview = &version
+			}
+		} else {
+			if latestNonPreview == nil || version.Name > latestNonPreview.Name {
+				latestNonPreview = &version
+			}
+		}
+	}
+
+	if latestNonPreview != nil {
+		return latestNonPreview
+	}
+	return latestPreview
 }
 
 // getARMConfig returns the config for ARM Swagger processing
