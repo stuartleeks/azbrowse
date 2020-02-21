@@ -65,37 +65,35 @@ func loadARMSwagger(config *swagger.Config) []*swagger.Path {
 	for _, serviceFileInfo := range serviceFileInfos {
 		if serviceFileInfo.IsDir() && serviceFileInfo.Name() != "common-types" {
 			fmt.Printf("Processing service folder: %s\n", serviceFileInfo.Name())
-			resourceTypeFileInfos, err := ioutil.ReadDir(fmt.Sprintf("swagger-specs/%s/resource-manager", serviceFileInfo.Name()))
+			readmePath := fmt.Sprintf("swagger-specs/%s/resource-manager/readme.md", serviceFileInfo.Name())
+			versions, err := swagger.GetVersionsFromAutoRestReadme(readmePath)
 			if err != nil {
-				continue // may just be data-plane folder
+				// Could be just
+				fmt.Printf("Error reading '%s': %s\n", readmePath, err)
+				continue
 			}
-			_, _ = getVersionsForFolder(fmt.Sprintf("swagger-specs/%s/resource-manager/readme.md", serviceFileInfo.Name()))
-			for _, resourceTypeFileInfo := range resourceTypeFileInfos {
-				if resourceTypeFileInfo.IsDir() && resourceTypeFileInfo.Name() != "common" {
-					swaggerPath := getFirstNonCommonPath(getFirstNonCommonPath(fmt.Sprintf("swagger-specs/%s/resource-manager/%s", serviceFileInfo.Name(), resourceTypeFileInfo.Name())))
-					swaggerFileInfos, err := ioutil.ReadDir(swaggerPath)
-					if err != nil {
-						panic(err)
-					}
-					// Build up paths for all files in the folder to allow proper sorting
-					folderPaths := []swagger.Path{}
-					for _, swaggerFileInfo := range swaggerFileInfos {
-						if !swaggerFileInfo.IsDir() && strings.HasSuffix(swaggerFileInfo.Name(), ".json") {
-							fmt.Printf("\tprocessing %s/%s\n", swaggerPath, swaggerFileInfo.Name())
-							doc := loadDoc(swaggerPath + "/" + swaggerFileInfo.Name())
-							filePaths, err := swagger.GetPathsFromSwagger(doc, config, "")
-							if err != nil {
-								panic(err)
-							}
-							folderPaths = append(folderPaths, filePaths...)
-						}
-					}
-					if len(folderPaths) > 0 {
-						paths, err = swagger.MergeSwaggerPaths(paths, config, folderPaths, true, "")
-						if err != nil {
-							panic(err)
-						}
-					}
+			if len(versions) == 0 {
+				fmt.Printf("No versions found in '%s'\n", readmePath)
+				continue
+			}
+			// TODO: add logic to determin which version to take!
+			version := versions[0]
+
+			apiPaths := []swagger.Path{}
+
+			for _, inputFile := range version.Files {
+				doc := loadDoc(inputFile)
+				newPaths, err := swagger.GetPathsFromSwagger(doc, config, "")
+				if err != nil {
+					panic(err)
+				}
+				apiPaths = append(apiPaths, newPaths...)
+			}
+
+			if len(apiPaths) > 0 {
+				paths, err = swagger.MergeSwaggerPaths(paths, config, apiPaths, true, "")
+				if err != nil {
+					panic(err)
 				}
 			}
 		}
