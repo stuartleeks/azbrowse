@@ -36,7 +36,7 @@ func GetVersionsFromAutoRestReadme(readmePath string) ([]APIVersion, error) {
 	}
 	content := string(buf)
 
-	r := regexp.MustCompile("```\\s?yaml \\$\\(tag\\) == '([a-z0-9\\-]*)'")
+	r := regexp.MustCompile("\n```\\s?yaml \\$\\(tag\\) == '([a-z0-9\\-]*)'\\s*\n")
 
 	matches := r.FindAllStringSubmatchIndex(content, -1)
 
@@ -45,7 +45,7 @@ func GetVersionsFromAutoRestReadme(readmePath string) ([]APIVersion, error) {
 		// indices 2 & 3 give the start/end of the capture
 		versionString := content[match[2]:match[3]]
 		if versionString != "all-api-versions" {
-			yamlStartIndex := match[1] + 1
+			yamlStartIndex := match[1]
 			offset := strings.Index(content[yamlStartIndex:], "```")
 			yamlSnippet := content[yamlStartIndex : yamlStartIndex+offset]
 
