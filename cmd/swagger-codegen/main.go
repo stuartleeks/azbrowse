@@ -65,35 +65,11 @@ func loadARMSwagger(config *swagger.Config) []*swagger.Path {
 	for _, serviceFileInfo := range serviceFileInfos {
 		if serviceFileInfo.IsDir() && serviceFileInfo.Name() != "common-types" {
 			fmt.Printf("Processing service folder: %s\n", serviceFileInfo.Name())
-			readmePath := fmt.Sprintf("swagger-temp/azure-rest-api-specs/specification/%s/resource-manager/readme.md", serviceFileInfo.Name())
-			versions, err := swagger.GetVersionsFromAutoRestReadme(readmePath)
+
+			apiPaths, err := loadSwaggerFromFolder(serviceFileInfo.Name())
 			if err != nil {
-				// Could be just
-				fmt.Printf("Error reading '%s': %s\n", readmePath, err)
+				fmt.Printf("Error loading swagger from '%s': %s\n", serviceFileInfo.Name(), err)
 				continue
-			}
-			if len(versions) == 0 {
-				fmt.Printf("No versions found in '%s'\n", readmePath)
-				continue
-			}
-
-			version := pickVersion(versions)
-			if version == nil {
-				fmt.Printf("No versions found in '%s'\n", readmePath)
-				continue
-			}
-
-			apiPaths := []swagger.Path{}
-
-			for _, inputFile := range version.Files {
-				inputFile = strings.ReplaceAll(inputFile, "\\", "/")
-				inputFile = fmt.Sprintf("swagger-temp/azure-rest-api-specs/specification/%s/resource-manager/%s", serviceFileInfo.Name(), inputFile)
-				doc := loadDoc(inputFile)
-				newPaths, err := swagger.GetPathsFromSwagger(doc, config, "")
-				if err != nil {
-					panic(err)
-				}
-				apiPaths = append(apiPaths, newPaths...)
 			}
 
 			if len(apiPaths) > 0 {
@@ -105,35 +81,6 @@ func loadARMSwagger(config *swagger.Config) []*swagger.Path {
 		}
 	}
 	return paths
-}
-
-func pickVersion(versions []swagger.APIVersion) *swagger.APIVersion {
-	if len(versions) == 0 {
-		return nil
-	}
-
-	var latestPreview *swagger.APIVersion
-	var latestNonPreview *swagger.APIVersion
-	for _, version := range versions {
-		version := version // <-- avoid loop variable capture issue
-		if strings.HasSuffix(version.Name, "-preview-only") {
-			continue
-		}
-		if strings.HasSuffix(version.Name, "-preview") {
-			if latestPreview == nil || version.Name > latestPreview.Name {
-				latestPreview = &version
-			}
-		} else {
-			if latestNonPreview == nil || version.Name > latestNonPreview.Name {
-				latestNonPreview = &version
-			}
-		}
-	}
-
-	if latestNonPreview != nil {
-		return latestNonPreview
-	}
-	return latestPreview
 }
 
 // getARMConfig returns the config for ARM Swagger processing
@@ -243,6 +190,65 @@ func loadAzureSearchDataPlaneSpecs(config *swagger.Config) []*swagger.Path {
 		}
 	}
 	return paths
+}
+
+func pickVersion(versions []swagger.APIVersion) *swagger.APIVersion {
+	if len(versions) == 0 {
+		return nil
+	}
+
+	var latestPreview *swagger.APIVersion
+	var latestNonPreview *swagger.APIVersion
+	for _, version := range versions {
+		version := version // <-- avoid loop variable capture issue
+		if strings.HasSuffix(version.Name, "-preview-only") {
+			continue
+		}
+		if strings.HasSuffix(version.Name, "-preview") {
+			if latestPreview == nil || version.Name > latestPreview.Name {
+				latestPreview = &version
+			}
+		} else {
+			if latestNonPreview == nil || version.Name > latestNonPreview.Name {
+				latestNonPreview = &version
+			}
+		}
+	}
+
+	if latestNonPreview != nil {
+		return latestNonPreview
+	}
+	return latestPreview
+}
+
+func loadSwaggerFromFolder(folderPath string) ([]swagger.Path, error) {
+	readmePath := fmt.Sprintf("swagger-temp/azure-rest-api-specs/specification/%s/resource-manager/readme.md", serviceFileInfo.Name())
+	versions, err := swagger.GetVersionsFromAutoRestReadme(readmePath)
+	if err != nil {
+		return []swagger.Path{}, fmt.Errorf("Error reading '%s': %s\n", readmePath, err)
+	}
+	if len(versions) == 0 {
+		return []swagger.Path{}, fmt.Errorf("No versions found in '%s'\n", readmePath)
+	}
+
+	version := pickVersion(versions)
+	if version == nil {
+		return []swagger.APIVersion{}, fmt.Errorf("No versions found in '%s'\n", readmePath)
+	}
+
+	apiPaths := []swagger.Path{}
+
+	for _, inputFile := range version.Files {
+		inputFile = strings.ReplaceAll(inputFile, "\\", "/")
+		inputFile = fmt.Sprintf("swagger-temp/azure-rest-api-specs/specification/%s/resource-manager/%s", serviceFileInfo.Name(), inputFile)
+		doc := loadDoc(inputFile)
+		newPaths, err := swagger.GetPathsFromSwagger(doc, config, "")
+		if err != nil {
+			panic(err)
+		}
+		apiPaths = append(apiPaths, newPaths...)
+	}
+	return apiPaths, nil
 }
 
 func loadDoc(path string) *loads.Document {
