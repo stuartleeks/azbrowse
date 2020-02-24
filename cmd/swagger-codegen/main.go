@@ -46,13 +46,13 @@ func main() {
 	writeOutput(paths, config, "./internal/pkg/expanders/swagger-armspecs.generated.go", "SwaggerAPISetARMResources")
 	fmt.Println()
 
-	// fmt.Println("*******************************************")
-	// fmt.Println("  Processing Azure Search Data-plane Specs ")
-	// fmt.Println("*******************************************")
-	// config = getAzureSearchDataPlaneConfig()
-	// paths = loadAzureSearchDataPlaneSpecs(config)
-	// writeOutput(paths, config, "./internal/pkg/expanders/search.generated.go", "AzureSearchServiceExpander")
-	// fmt.Println()
+	fmt.Println("*******************************************")
+	fmt.Println("  Processing Azure Search Data-plane Specs ")
+	fmt.Println("*******************************************")
+	config = getAzureSearchDataPlaneConfig()
+	paths = loadAzureSearchDataPlaneSpecs(config)
+	writeOutput(paths, config, "./internal/pkg/expanders/search.generated.go", "AzureSearchServiceExpander")
+	fmt.Println()
 
 }
 
@@ -167,7 +167,7 @@ func loadAzureSearchDataPlaneSpecs(config *swagger.Config) []*swagger.Path {
 
 	directoryNames := []string{"Microsoft.Azure.Search.Service", "Microsoft.Azure.Search.Data"} // need to control the document load order
 	for _, directoryName := range directoryNames {
-		swaggerPath := getFirstNonCommonPath(getFirstNonCommonPath(fmt.Sprintf("swagger-specs/search/data-plane/%s", directoryName)))
+		swaggerPath := getFirstNonCommonPath(getFirstNonCommonPath(fmt.Sprintf("swagger-temp/search/data-plane/%s", directoryName)))
 		swaggerFileInfos, err := ioutil.ReadDir(swaggerPath)
 		if err != nil {
 			panic(err)
