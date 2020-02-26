@@ -90,7 +90,7 @@ def pick_api_version(api_versions):
         return None
 
     sorted_versions = sorted(candidate_versions, key=get_name)
-    return sorted_versions[0]
+    return sorted_versions[-1]
 
 if __name__ == "__main__":
     rp_folders = sorted(
@@ -107,5 +107,8 @@ if __name__ == "__main__":
         if api_version == None:
             print("No suitable api version, ignoring: " + folder)
             continue
-
-        print("TODO: process " + folder + ". Version: " + api_version.get_name())
+        
+        print()
+        print(folder + ", using api-version " + api_version.get_name())
+        for file in api_version.get_input_files():
+            print("  -> " + file)
