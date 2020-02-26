@@ -43,7 +43,7 @@ class ApiVersion:
         return self.input_files
 
 
-def get_api_versions_from_readme(readme_path):
+def get_all_api_versions_from_readme(readme_path):
     if not os.path.isfile(readme_path):
         return None
     with open(readme_path, "r", encoding="utf8") as stream:
@@ -92,6 +92,12 @@ def pick_api_version(api_versions):
     sorted_versions = sorted(candidate_versions, key=get_name)
     return sorted_versions[-1]
 
+def get_api_version_from_readme(readme_path):
+    api_versions = get_all_api_versions_from_readme(readme_path)
+    if api_versions == None:
+        return None
+    return pick_api_version(api_versions)
+
 if __name__ == "__main__":
     rp_folders = sorted(
         [f.path for f in os.scandir("./swagger-temp/azure-rest-api-specs/specification") if f.is_dir()]
@@ -99,13 +105,9 @@ if __name__ == "__main__":
 
     for folder in rp_folders:
         readme_path = folder + "/resource-manager/readme.md"
-        api_versions = get_api_versions_from_readme(readme_path)
-        if api_versions == None:
-            print("No readme, ignoring: " + folder)
-            continue
-        api_version = pick_api_version(api_versions)
+        api_version = get_api_version_from_readme(readme_path)
         if api_version == None:
-            print("No suitable api version, ignoring: " + folder)
+            print("No api version found, ignoring: " + folder)
             continue
         
         print()

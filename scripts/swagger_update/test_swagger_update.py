@@ -3,7 +3,7 @@ from swagger_update import *
 
 
 def test_get_yaml_files_from_readme_with_invalid_file_path_returns_none():
-    result = get_yaml_files_from_readme(
+    result = get_all_api_versions_from_readme(
         "./scripts/swagger_update/test_data/does_not_exist.md"
     )
     assert (
@@ -12,7 +12,7 @@ def test_get_yaml_files_from_readme_with_invalid_file_path_returns_none():
 
 
 def test_get_yaml_files_from_readme_with_invalid_file_path_returns_correct_list():
-    api_versions = get_yaml_files_from_readme(
+    api_versions = get_all_api_versions_from_readme(
         "./scripts/swagger_update/test_data/file_with_simple_tags.md"
     )
     assert len(api_versions) == 6, "Expected 5 versions"
