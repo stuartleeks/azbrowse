@@ -72,6 +72,7 @@ install:
 ## swagger-update:
 ##		Download the latest swagger definitions for Azure services and filter to the latest versions
 swagger-update:
+	pip3 install -r scripts/swagger_update/requirements.txt 
 	python3 ./scripts/swagger_update/swagger_update.py
 	
 ## swagger-codegen:

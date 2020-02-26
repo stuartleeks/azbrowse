@@ -46,7 +46,7 @@ class ApiVersion:
 def get_api_versions_from_readme(readme_path):
     if not os.path.isfile(readme_path):
         return None
-    with open(readme_path, "r") as stream:
+    with open(readme_path, "r", encoding="utf8") as stream:
         contents = stream.read()
 
     results = []
@@ -94,18 +94,18 @@ def pick_api_version(api_versions):
 
 if __name__ == "__main__":
     rp_folders = sorted(
-        [f.path for f in os.scandir("gittemp/specification") if f.is_dir()]
+        [f.path for f in os.scandir("./swagger-temp/azure-rest-api-specs/specification") if f.is_dir()]
     )
 
-    for f in rp_folders:
-        readme_path = f"{f}/resource-manager/readme.md"
+    for folder in rp_folders:
+        readme_path = folder + "/resource-manager/readme.md"
         api_versions = get_api_versions_from_readme(readme_path)
         if api_versions == None:
-            print(f"No readme, ignoring: {f}")
+            print("No readme, ignoring: " + folder)
             continue
         api_version = pick_api_version(api_versions)
         if api_version == None:
-            print(f"No suitable api version, ignoring: {f}")
+            print("No suitable api version, ignoring: " + folder)
             continue
 
-        print(f"TODO: process {f}. Version: {api_version.get_name()}")
+        print("TODO: process " + folder + ". Version: " + api_version.get_name())
