@@ -4,23 +4,6 @@ import os
 import re
 import yaml
 
-# last_git_message=""
-# def show_git_progress(op_code, cur_count, max_count, message):
-#     global last_git_message
-#     if (message != "" and message != last_git_message):
-#         print(message)
-#         last_git_message = message
-
-# if os.path.exists("gittemp"):
-#     print("Deleting gittemp...")
-#     shutil.rmtree("gittemp")
-
-# print ("Cloning specs...")
-# repo = Repo()
-# repo.clone_from("git@github.com:azure/azure-rest-api-specs", "gittemp", progress=show_git_progress, multi_options=["--depth=1"])
-# print ("Cloned")
-
-
 # TODO
 # - add docs to top to state goals (recreate folder structure for any files that are copied by looking up in readme.md)
 # - add function to find latest version (add unit tests for this!)
@@ -82,7 +65,27 @@ def get_api_version_from_readme(readme_path):
     api_version = find_api_version(contents, version_tag)
     return api_version
 
+last_git_message=""
+def show_git_progress(op_code, cur_count, max_count, message):
+    global last_git_message
+    if (message != "" and message != last_git_message):
+        print(message)
+        last_git_message = message
+
+def clone_swagger_specs():
+    if os.path.exists("gittemp"):
+        print("Deleting gittemp...")
+        shutil.rmtree("gittemp")
+
+    print ("Cloning specs...")
+    repo = Repo()
+    repo.clone_from("git@github.com:azure/azure-rest-api-specs", "gittemp", progress=show_git_progress, multi_options=["--depth=1"])
+    print ("Cloned")
+
+
 if __name__ == "__main__":
+    # clone_swagger_specs()
+
     rp_folders = sorted(
         [f.path for f in os.scandir("./swagger-temp/azure-rest-api-specs/specification") if f.is_dir()]
     )
