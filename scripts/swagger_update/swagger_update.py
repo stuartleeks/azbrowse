@@ -26,10 +26,6 @@ import yaml
 # - add function to find latest version (add unit tests for this!)
 
 
-def foo(i):
-    return i + 1
-
-
 class ApiVersion:
     def __init__(self, name, input_files):
         # super().__init__()
@@ -92,11 +88,47 @@ def pick_api_version(api_versions):
     sorted_versions = sorted(candidate_versions, key=get_name)
     return sorted_versions[-1]
 
-def get_api_version_from_readme(readme_path):
-    api_versions = get_all_api_versions_from_readme(readme_path)
-    if api_versions == None:
+
+def get_api_version_tag(readme_contents):
+    tag_regex = re.compile("openapi-type: arm\ntag: ([a-z\\-0-9]*)")
+    match = tag_regex.search(readme_contents)
+    if match == None:
         return None
-    return pick_api_version(api_versions)
+
+    tag = match.group(1)
+    return tag
+
+def find_api_version(readme_contents, version_tag):
+    code_block_end_regex = re.compile("^[\\s]*```[\\s]*$", flags=re.MULTILINE)
+
+    start_match = re.search("^```[\\s]*yaml \\$\\(tag\\) == '" + version_tag + "'$", readme_contents, flags=re.MULTILINE)
+    if start_match == None:
+        return None
+
+    end_match = code_block_end_regex.search(readme_contents, start_match.start())
+    yaml_contents = readme_contents[start_match.end() : end_match.start()]
+
+    yaml_data = yaml.load(yaml_contents, Loader=yaml.BaseLoader)
+    input_files = []
+    if yaml_data != None:
+        input_files = yaml_data["input-file"]
+    api_version = ApiVersion(version_tag, input_files)
+    
+    return api_version
+
+def get_api_version_from_readme(readme_path):
+    if not os.path.isfile(readme_path):
+        return None
+    with open(readme_path, "r", encoding="utf8") as stream:
+        contents = stream.read()
+
+    version_tag = get_api_version_tag(contents)
+    if version_tag == None:
+        return None
+
+    print("Version:" + version_tag)
+    api_version = find_api_version(contents, version_tag)
+    return api_version
 
 if __name__ == "__main__":
     rp_folders = sorted(
@@ -106,11 +138,11 @@ if __name__ == "__main__":
     for folder in rp_folders:
         readme_path = folder + "/resource-manager/readme.md"
         api_version = get_api_version_from_readme(readme_path)
+        print()
         if api_version == None:
-            print("No api version found, ignoring: " + folder)
+            print("***No api version found, ignoring: " + folder)
             continue
         
-        print()
         print(folder + ", using api-version " + api_version.get_name())
         for file in api_version.get_input_files():
             print("  -> " + file)
