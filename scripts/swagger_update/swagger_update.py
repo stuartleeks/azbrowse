@@ -38,57 +38,6 @@ class ApiVersion:
     def get_input_files(self):
         return self.input_files
 
-
-def get_all_api_versions_from_readme(readme_path):
-    if not os.path.isfile(readme_path):
-        return None
-    with open(readme_path, "r", encoding="utf8") as stream:
-        contents = stream.read()
-
-    results = []
-
-    # TODO - since this function will be invoked multiple times, move the compilation external to the function?
-    yaml_start_regex = re.compile(
-        "^```[\\s]*yaml \\$\\(tag\\) == '([a-z\\-0-9]*)'$", flags=re.MULTILINE
-    )
-    code_block_end_regex = re.compile("^[\\s]*```[\\s]*$", flags=re.MULTILINE)
-
-    search_start = 0
-    while True:
-        block_start_match = yaml_start_regex.search(contents, search_start)
-        if block_start_match == None:
-            break
-        tag = block_start_match.group(1)
-        search_start = block_start_match.end()
-
-        block_end_match = code_block_end_regex.search(contents, search_start)
-        if block_end_match == None:
-            break
-
-        yaml_contents = contents[search_start : block_end_match.start()]
-        search_start = block_end_match.end()
-
-        yaml_data = yaml.load(yaml_contents, Loader=yaml.BaseLoader)
-        input_files = []
-        if yaml_data != None:
-            input_files = yaml_data["input-file"]
-        api_version = ApiVersion(tag, input_files)
-        results.append(api_version)
-
-    return results
-
-def pick_api_version(api_versions):
-    def get_name(api_version):
-        return api_version.get_name()
-
-    candidate_versions = [v for v in api_versions if v.get_name() != "all-api-versions" and not v.get_name().endswith("-preview-only")]
-    if len(candidate_versions) == 0:
-        return None
-
-    sorted_versions = sorted(candidate_versions, key=get_name)
-    return sorted_versions[-1]
-
-
 def get_api_version_tag(readme_contents):
     tag_regex = re.compile("openapi-type: arm\ntag: ([a-z\\-0-9]*)")
     match = tag_regex.search(readme_contents)
