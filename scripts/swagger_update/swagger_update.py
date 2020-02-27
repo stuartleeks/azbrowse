@@ -101,11 +101,14 @@ def get_api_version_tag(readme_contents):
 def find_api_version(readme_contents, version_tag):
     code_block_end_regex = re.compile("^[\\s]*```[\\s]*$", flags=re.MULTILINE)
 
-    start_match = re.search("^```[\\s]*yaml \\$\\(tag\\) == '" + version_tag + "'$", readme_contents, flags=re.MULTILINE)
+    # Regex to match:   ```yaml $(tag) == 'the-version-tag`
+    # Also match:       ```yaml $(tag) == 'the-version-tag` || $(tag) == 'some-other-tag'
+    # But don't match   ```yaml $(tag) == 'the-version-tag' && $(another-condition)
+    start_match = re.search("^```[\\s]*yaml [^&^\\n]*\\$\\(tag\\) == '" + version_tag + "'[^&^\\n]*$", readme_contents, flags=re.MULTILINE)
     if start_match == None:
         return None
 
-    end_match = code_block_end_regex.search(readme_contents, start_match.start())
+    end_match = code_block_end_regex.search(readme_contents, start_match.end())
     yaml_contents = readme_contents[start_match.end() : end_match.start()]
 
     yaml_data = yaml.load(yaml_contents, Loader=yaml.BaseLoader)

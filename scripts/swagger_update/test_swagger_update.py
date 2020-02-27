@@ -44,16 +44,13 @@ def test_get_api_version_from_readme_with_multiple_tags_on_a_line_returns_correc
 
     assert api_version.get_name() == "package-2019-08"
     input_files = api_version.get_input_files()
-    assert len(input_files) == 3
+    assert len(input_files) == 2
     assert (
         input_files[0]
-        == "Microsoft.ContainerRegistry/stable/2019-05-01/containerregistry.json"
+        == "Microsoft.CertificateRegistration/stable/2019-08-01/AppServiceCertificateOrders.json"
     )
     assert (
         input_files[1]
-        == "Microsoft.ContainerRegistry/preview/2019-06-01-preview/containerregistry_build.json"
+        == "Microsoft.CertificateRegistration/stable/2019-08-01/CertificateRegistrationProvider.json"
     )
-    assert (
-        input_files[2]
-        == "Microsoft.ContainerRegistry/preview/2019-05-01-preview/containerregistry_scopemap.json"
-    )
+
