@@ -6,9 +6,7 @@ def test_get_api_version_from_readme_with_invalid_file_path_returns_none():
     result = get_api_version_from_readme(
         "./scripts/swagger_update/test_data/does_not_exist.md"
     )
-    assert (
-        result == None
-    ), "Should return None for file that doesn't exist"
+    assert result == None, "Should return None for file that doesn't exist"
 
 
 def test_get_api_version_from_readme_with_simple_tags_returns_correct_fileset():
@@ -53,4 +51,3 @@ def test_get_api_version_from_readme_with_multiple_tags_on_a_line_returns_correc
         input_files[1]
         == "Microsoft.CertificateRegistration/stable/2019-08-01/CertificateRegistrationProvider.json"
     )
-
