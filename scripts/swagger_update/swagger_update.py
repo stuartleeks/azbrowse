@@ -106,6 +106,8 @@ def clone_swagger_specs(target_folder):
         multi_options=["--depth=1"],
     )
     print("Cloned")
+    repo.clone_from("https://github.com/azure/azure-rest-api-specs", "gittemp", progress=show_git_progress, multi_options=["--depth=1"])
+    print ("Cloned")
 
 
 class ResourceManagerApiSet:
@@ -113,7 +115,6 @@ class ResourceManagerApiSet:
         self.resource_provider_name = resource_provider_name
         self.base_folder = base_folder
         self.api_version = api_version
-
     def get_resource_provider_name(self):
         return self.resource_provider_name
 
