@@ -3,6 +3,7 @@ import shutil
 import os
 import re
 import yaml
+import json
 
 # TODO
 # - add docs to top to state goals (recreate folder structure for any files that are copied by looking up in readme.md)
@@ -18,6 +19,9 @@ class ApiVersion:
 
     def get_input_files(self):
         return self.input_files
+
+    def to_json(self):
+        return json.dumps(self.__dict__, ensure_ascii=False, sort_keys=True)
 
 
 def get_api_version_tag(resource_provider_name, readme_contents, overrides):
@@ -158,7 +162,6 @@ def copy_api_sets_to_swagger_specs(api_sets, source_folder, target_folder):
         # Doing that would remove the need for these additional checks
         # as well as fixing the problem with definitions referenced back in other folders as with comsmos-db etc
 
-
         # Look for `common` folder under the `resource-manager` folder
         copy_child_folder_if_exists(
             resource_provider_source,
@@ -195,12 +198,15 @@ def copy_api_sets_to_swagger_specs(api_sets, source_folder, target_folder):
             if os.path.exists(resource_provider_source + "/" + api_version_folder + "/common.json"):
                 copy_file_ensure_paths(resource_provider_source, resource_provider_target, api_version_folder + "/common.json")
 
-
-        # Copy the files definte in the api version
+        # Copy the files defined in the api version
         for file in api_version.get_input_files():
             copy_file_ensure_paths(resource_provider_source, resource_provider_target, file)
 
-    # TODO write json file per folder with contents to load for swagger-codegen?
+        # Write api-set.json file per folder with contents to load for swagger-codegen
+        api_set_filename = resource_provider_target + "/api-set.json"
+        print("Writing " + api_set_filename)
+        with open(api_set_filename, "w") as f:
+            f.write(api_version.to_json())
 
 def get_api_set_for_folder(spec_folder, api_folder, resource_provider_name, version_overrides):
     api_version = get_api_version_from_readme(resource_provider_name, api_folder + "/readme.md", version_overrides)

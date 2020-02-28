@@ -71,6 +71,9 @@ func loadARMSwagger(config *swagger.Config) []*swagger.Path {
 			for _, resourceTypeFileInfo := range resourceTypeFileInfos {
 				if resourceTypeFileInfo.IsDir() && resourceTypeFileInfo.Name() != "common" {
 					swaggerPath := getFirstNonCommonPath(getFirstNonCommonPath(fmt.Sprintf("swagger-specs/%s/resource-manager/%s", serviceFileInfo.Name(), resourceTypeFileInfo.Name())))
+					// TODO _____________________________________________________________________________________________
+					// TODO ___________________________________LOAD api-set.json_________________________________________
+					// TODO _____________________________________________________________________________________________
 					swaggerFileInfos, err := ioutil.ReadDir(swaggerPath)
 					if err != nil {
 						panic(err)
