@@ -10,7 +10,8 @@ import yaml
 
 # resource_provider_version_overrides is keyed on RP name with the value being the tag to force
 resource_provider_version_overrides = {
-    "cosmos-db": "package-2019-08-preview"  # the 2019-12 version includes 2019-08-preview files that reference files not in the 2019-12 list!
+    "cosmos-db": "package-2019-08-preview",  # the 2019-12 version includes 2019-08-preview files that reference files not in the 2019-12 list!
+    "frontdoor": "package-2019-11",
 }
 
 
@@ -158,6 +159,14 @@ def copy_file_ensure_paths(source_file, target_file):
     shutil.copy(source_file, target_file)
 
 
+def copy_child_folder_if_exists(source_base, target_base, relative_path):
+    source_path = source_base + "/" + relative_path
+    if os.path.exists(source_path):
+        target_path = target_base + "/" + relative_path
+        print("---> " + relative_path)
+        shutil.copytree(source_path, target_path)
+
+
 def copy_api_sets_to_swagger_specs(api_sets, source_folder, target_folder):
     for api_set in api_sets:
         print("\nCopying " + api_set.get_resource_provider_name())
@@ -181,15 +190,27 @@ def copy_api_sets_to_swagger_specs(api_sets, source_folder, target_folder):
             [x[0 : x.index("/")] for x in api_version.get_input_files()]
         )
         for resource_type_folder in resource_type_folders:
-            source_path = (
-                resource_provider_source + "/" + resource_type_folder + "/common"
+            copy_child_folder_if_exists(
+                resource_provider_source,
+                resource_provider_target,
+                resource_type_folder + "/common",
             )
-            if os.path.exists(source_path):
-                target_path = (
-                    resource_provider_target + "/" + resource_type_folder + "/common"
-                )
-                print("---> " + resource_type_folder + "/common/*")
-                shutil.copytree(source_path, target_path)
+
+        # Look for `entityTypes` or `definitions` folders under api versions
+        api_version_folders = set(
+            [x[0 : x.rfind("/")] for x in api_version.get_input_files()]
+        )
+        for api_version_folder in api_version_folders:
+            copy_child_folder_if_exists(
+                resource_provider_source,
+                resource_provider_target,
+                api_version_folder + "/entityTypes",
+            )
+            copy_child_folder_if_exists(
+                resource_provider_source,
+                resource_provider_target,
+                api_version_folder + "/definitions",
+            )
 
         # Copy the files definte in the api version
         for file in api_version.get_input_files():
