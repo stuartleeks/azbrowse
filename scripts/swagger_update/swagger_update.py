@@ -8,16 +8,8 @@ import yaml
 # - add docs to top to state goals (recreate folder structure for any files that are copied by looking up in readme.md)
 # - add function to find latest version (add unit tests for this!)
 
-# resource_provider_version_overrides is keyed on RP name with the value being the tag to force
-resource_provider_version_overrides = {
-    "cosmos-db": "package-2019-08-preview",  # the 2019-12 version includes 2019-08-preview files that reference files not in the 2019-12 list!
-    "frontdoor": "package-2019-10", # same issue as cosmos-db with spec contents referencing files not listed in the package
-}
-
-
 class ApiVersion:
     def __init__(self, name, input_files):
-        # super().__init__()
         self.name = name
         self.input_files = input_files
 
@@ -28,12 +20,12 @@ class ApiVersion:
         return self.input_files
 
 
-def get_api_version_tag(resource_provider_name, readme_contents):
-    override = resource_provider_version_overrides.get(resource_provider_name)
+def get_api_version_tag(resource_provider_name, readme_contents, overrides):
+    override = overrides.get(resource_provider_name)
     if override != None:
         return override
 
-    tag_regex = re.compile("openapi-type: arm\ntag: ([a-z\\-0-9]*)")
+    tag_regex = re.compile("openapi-type: [a-z\\-]+\ntag: ([a-z\\-0-9]*)")
     match = tag_regex.search(readme_contents)
     if match == None:
         return None
@@ -68,14 +60,16 @@ def find_api_version(readme_contents, version_tag):
     return api_version
 
 
-def get_api_version_from_readme(resource_provider_name, readme_path):
+def get_api_version_from_readme(resource_provider_name, readme_path, version_overrides):
     if not os.path.isfile(readme_path):
+        print("==> file not found: " + readme_path)
         return None
     with open(readme_path, "r", encoding="utf8") as stream:
         contents = stream.read()
 
-    version_tag = get_api_version_tag(resource_provider_name, contents)
+    version_tag = get_api_version_tag(resource_provider_name, contents, version_overrides)
     if version_tag == None:
+        print("==> no version tag found in readme: " + readme_path)
         return None
 
     api_version = find_api_version(contents, version_tag)
@@ -106,11 +100,9 @@ def clone_swagger_specs(target_folder):
         multi_options=["--depth=1"],
     )
     print("Cloned")
-    repo.clone_from("https://github.com/azure/azure-rest-api-specs", "gittemp", progress=show_git_progress, multi_options=["--depth=1"])
-    print ("Cloned")
 
 
-class ResourceManagerApiSet:
+class ApiSet:
     def __init__(self, resource_provider_name, base_folder, api_version):
         self.resource_provider_name = resource_provider_name
         self.base_folder = base_folder
@@ -123,32 +115,6 @@ class ResourceManagerApiSet:
 
     def get_api_version(self):
         return self.api_version
-
-
-def get_resource_manager_api_sets(base_folder):
-    rp_folders = sorted([f.path for f in os.scandir(base_folder) if f.is_dir()])
-    api_sets = []
-    for folder in rp_folders:
-        resource_provider_name = folder.split("/")[-1]
-        readme_path = folder + "/resource-manager/readme.md"
-        api_version = get_api_version_from_readme(resource_provider_name, readme_path)
-
-        if api_version == None:
-            print("***No api version found, ignoring: " + folder)
-            continue
-
-        spec_relative_folder = folder[len(base_folder) + 1 :]
-        print(spec_relative_folder + ", using api-version " + api_version.get_name())
-
-        api_set = ResourceManagerApiSet(
-            resource_provider_name,
-            spec_relative_folder + "/resource-manager",
-            api_version,
-        )
-        api_sets.append(api_set)
-
-    return api_sets
-
 
 def get_folder_for_file(file):
     return file[0 : file.rfind("/")]
@@ -178,15 +144,11 @@ def copy_api_sets_to_swagger_specs(api_sets, source_folder, target_folder):
 
         resource_provider_source = (
             source_folder
-            + "/"
-            + api_set.get_resource_provider_name()
-            + "/resource-manager"
+            + "/" + api_set.get_base_folder()
         )
         resource_provider_target = (
             target_folder
-            + "/"
-            + api_set.get_resource_provider_name()
-            + "/resource-manager"
+            + "/" + api_set.get_base_folder()
         )
 
         # The core of this method is to copy the files defined by the api version
@@ -238,35 +200,104 @@ def copy_api_sets_to_swagger_specs(api_sets, source_folder, target_folder):
         for file in api_version.get_input_files():
             copy_file_ensure_paths(resource_provider_source, resource_provider_target, file)
 
-    # TODO write json file per folder with contents to load?
+    # TODO write json file per folder with contents to load for swagger-codegen?
+
+def get_api_set_for_folder(spec_folder, api_folder, resource_provider_name, version_overrides):
+    api_version = get_api_version_from_readme(resource_provider_name, api_folder + "/readme.md", version_overrides)
+    if api_version == None:
+        return None
+    spec_relative_folder = api_folder[len(spec_folder) + 1 :]
+    api_set = ApiSet(
+        resource_provider_name,
+        spec_relative_folder, 
+        api_version
+    )
+    return api_set
 
 
-if __name__ == "__main__":
-    # clone_swagger_specs("swagger-temp")
+def get_resource_manager_api_sets(spec_folder, version_overrides):
+    rp_folders = sorted([f.path for f in os.scandir(spec_folder) if f.is_dir()])
+    api_sets = []
+    for folder in rp_folders:
+        resource_provider_name = folder.split("/")[-1]
+        got_api_set = False
+        
+        for api_type_folder in ["resource-manager", "data-plane"]:
+            qualified_api_type_folder = folder + "/" + api_type_folder
+            if not os.path.exists(qualified_api_type_folder):
+                continue
+            
+            api_set = get_api_set_for_folder(spec_folder, qualified_api_type_folder, resource_provider_name, version_overrides)
+            if api_set != None:
+                api_sets.append(api_set)
+                got_api_set = True
+            else:
+                # didn't find readme.md under (e.g.) search/data-plane/
+                # look for search/data-plane/*/readme.md
+                print("\n*************************************************************************************")
+                print(qualified_api_type_folder)
+                # sub_folders = [f.path for f in os.scandir(qualified_api_type_folder) if f.is_dir() and os.path.exists(qualified_api_type_folder + "/" + f.path + "/readme.md")]
+                sub_folders = [f.path for f in os.scandir(qualified_api_type_folder) if f.is_dir()]
+                for sub_folder in sub_folders:
+                    print(sub_folder)
+                    api_set = get_api_set_for_folder(spec_folder, sub_folder, resource_provider_name, version_overrides)
+                    if api_set != None:
+                        print("got api_set")
+                        api_sets.append(api_set)
+                        got_api_set = True
 
-    if os.path.exists("swagger-specs"):
-        print("Deleting swagger-specs...")
-        shutil.rmtree("swagger-specs")
+
+        if not got_api_set:
+            print("***No api version found, ignoring: " + folder)
+
+    return api_sets
+
+
+def copy_arm_specs():
+    # resource_provider_version_overrides is keyed on RP name with the value being the tag to force
+    resource_provider_version_overrides = {
+        "cosmos-db": "package-2019-08-preview",  # the 2019-12 version includes 2019-08-preview files that reference files not in the 2019-12 list!
+        "frontdoor": "package-2019-10", # same issue as cosmos-db with spec contents referencing files not listed in the package
+    }
 
     print(
         "\n****************************************************************************"
     )
-    print("Discovering api sets:")
+    print("Discovering resource manager api sets:")
     api_sets = get_resource_manager_api_sets(
-        "./swagger-temp/azure-rest-api-specs/specification"
+        "./swagger-temp/azure-rest-api-specs/specification", 
+        resource_provider_version_overrides
     )
 
     print(
         "\n****************************************************************************"
     )
-    print("Copying files:")
+    print("Copying resource-manager files:")
     copy_api_sets_to_swagger_specs(
         api_sets,
         "./swagger-temp/azure-rest-api-specs/specification",
         "./swagger-specs",
     )
-
     shutil.copytree(
         "./swagger-temp/azure-rest-api-specs/specification/common-types",
         "./swagger-specs/common-types",
     )
+
+if __name__ == "__main__":
+    # print(
+    #     "\n****************************************************************************"
+    # )
+    # print("Cloning azure-rest-api-sets repo")
+    # clone_swagger_specs("swagger-temp")
+
+    print(
+        "\n****************************************************************************"
+    )
+    print("Deleting ")
+    if os.path.exists("swagger-specs"):
+        print("Deleting swagger-specs...")
+        shutil.rmtree("swagger-specs")
+
+    copy_arm_specs()
+
+
