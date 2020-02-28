@@ -11,7 +11,7 @@ import yaml
 # resource_provider_version_overrides is keyed on RP name with the value being the tag to force
 resource_provider_version_overrides = {
     "cosmos-db": "package-2019-08-preview",  # the 2019-12 version includes 2019-08-preview files that reference files not in the 2019-12 list!
-    "frontdoor": "package-2019-11",
+    "frontdoor": "package-2019-10", # same issue as cosmos-db with spec contents referencing files not listed in the package
 }
 
 
@@ -154,7 +154,10 @@ def get_folder_for_file(file):
     return file[0 : file.rfind("/")]
 
 
-def copy_file_ensure_paths(source_file, target_file):
+def copy_file_ensure_paths(source_base, target_base, file):
+    source_file = source_base + "/" + file
+    target_file = target_base + "/" + file
+    print("--> " + target_file)
     target_folder = get_folder_for_file(target_file)
     os.makedirs(target_folder, exist_ok=True)
     shutil.copy(source_file, target_file)
@@ -186,6 +189,21 @@ def copy_api_sets_to_swagger_specs(api_sets, source_folder, target_folder):
             + "/resource-manager"
         )
 
+        # The core of this method is to copy the files defined by the api version
+        # There are some places where additional files that aren't listed in the definition tend to live
+        # For now we're handling the separate cases (e.g. `common`)
+        # We _could_ load the specs and scan for linked files and build out the list that way
+        # Doing that would remove the need for these additional checks
+        # as well as fixing the problem with definitions referenced back in other folders as with comsmos-db etc
+
+
+        # Look for `common` folder under the `resource-manager` folder
+        copy_child_folder_if_exists(
+            resource_provider_source,
+            resource_provider_target,
+            "/common",
+        )
+
         # Look for `common` folders under the resource type folder
         resource_type_folders = set(
             [x[0 : x.index("/")] for x in api_version.get_input_files()]
@@ -212,14 +230,14 @@ def copy_api_sets_to_swagger_specs(api_sets, source_folder, target_folder):
                 resource_provider_target,
                 api_version_folder + "/definitions",
             )
+            if os.path.exists(resource_provider_source + "/" + api_version_folder + "/common.json"):
+                copy_file_ensure_paths(resource_provider_source, resource_provider_target, api_version_folder + "/common.json")
+
 
         # Copy the files definte in the api version
         for file in api_version.get_input_files():
-            print("--> " + file)
-            copy_file_ensure_paths(
-                resource_provider_source + "/" + file,
-                resource_provider_target + "/" + file,
-            )
+            copy_file_ensure_paths(resource_provider_source, resource_provider_target, file)
+
     # TODO write json file per folder with contents to load?
 
 
