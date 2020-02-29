@@ -66,8 +66,8 @@ def find_api_version(readme_contents, version_tag):
 
 def get_api_version_from_readme(resource_provider_name, readme_path, version_overrides):
     if not os.path.isfile(readme_path):
-        print("==> file not found: " + readme_path)
         return None
+    print("==> Opening: " + readme_path)
     with open(readme_path, "r", encoding="utf8") as stream:
         contents = stream.read()
 
@@ -226,6 +226,10 @@ def get_resource_manager_api_sets(spec_folder, version_overrides):
     api_sets = []
     for folder in rp_folders:
         resource_provider_name = folder.split("/")[-1]
+        if version_overrides.get(resource_provider_name) == "":
+            print("Resource provider " + resource_provider_name + " is skipped in config")
+            continue
+
         got_api_set = False
         
         for api_type_folder in ["resource-manager", "data-plane"]:
@@ -263,7 +267,12 @@ def copy_arm_specs():
     # resource_provider_version_overrides is keyed on RP name with the value being the tag to force
     resource_provider_version_overrides = {
         "cosmos-db": "package-2019-08-preview",  # the 2019-12 version includes 2019-08-preview files that reference files not in the 2019-12 list!
-        "frontdoor": "package-2019-10", # same issue as cosmos-db with spec contents referencing files not listed in the package
+        # frontdoor 2020-01 references 2019-11-01/network.json which is not listed in the input files
+        # frontdoor 2019-11 references 2019-05-01/network.json which is not listed in the input files
+        # frontdoor 2019-10 references 2019-10-01/network.json which is not listed in the input files
+        # frontdoor 2019-05 references 2019-03-01/network.json which is not listed in the input files
+        # frontdoor 2019-04 references 2019-03-01/network.json which is not listed in the input files
+        "frontdoor" : "",
     }
 
     print(
