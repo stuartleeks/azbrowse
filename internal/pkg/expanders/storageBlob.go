@@ -125,30 +125,55 @@ func (e *StorageBlobExpander) Delete(ctx context.Context, currentItem *TreeNode)
 }
 
 func (e *StorageBlobExpander) expandBlobs(ctx context.Context, currentItem *TreeNode) ExpanderResult {
-	
+	// "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/{accountName}/listKeys"
+
+	containerID := currentItem.Metadata["ContainerID"]
+	key, err = e.getAccountKey(ctx, containerID)
+	if err != nil {
+		err = fmt.Errorf("Error getting account key: %s", err)
+		return ExpanderResult{
+			Err: err,
+			SourceDescription: "StorageBlobExpander request",
+		}
+	}
+
 	return ExpanderResult{
 		Err: fmt.Errorf("TODO"),
 		SourceDescription: "StorageBlobExpander request",
 	}
 }
 
+// StorageListKeyResponse is used to unmarshal a call to listKeys on a storage account 
+type StorageListKeyResponse struct {
+	Keys []struct{
+		KeyName string `json:"keyName"`
+		Value string `json:"value"`
+		Permissions string `json:"permissions"`
+	} `json:"keys"`
+}
 
+func (e *StorageBlobExpander) getAccountKey(ctx context.Context, containerID string) (string, error) {
+	
+	i := strings.Index(containerID, "/blobServices")
+	rootURL := containerID[0:i]
+	listKeysURL := rootURL + "/listKeys?api-version=2019-06-01"
 
-func (e *StorageBlobExpander) get(ctx context.Context, registryID string) (string, error) {
-	data, err := e.armClient.DoRequest(ctx, "GET", registryID)
+	data, err := e.armClient.DoRequest(ctx, "POST", listKeysURL)
 	if err != nil {
-		return "", fmt.Errorf("Failed to get registry: " + err.Error() + registryID)
+		return "", fmt.Errorf("Error calling listKeys: %s", err)
 	}
-	var response containerRegistryResponse
+	response := StorageListKeyResponse{}
 	err = json.Unmarshal([]byte(data), &response)
 	if err != nil {
-		err = fmt.Errorf("Error unmarshalling response: %s\nURL:%s", err, registryID)
+		err = fmt.Errorf("Error unmarshalling response: %s\nURL:%s", err, listKeysURL)
+		return "", err
+	}
+	if len(response.Keys) == 0 {
+		err = fmt.Errorf("No keys in response: %s", err)
 		return "", err
 	}
 
-	// TODO also capture SKU to ensure it is a managed SKU
-	loginServer := response.Properties.LoginServer
-	return loginServer, nil
+	return response.Keys[0].Value, nil
 }
 
 
