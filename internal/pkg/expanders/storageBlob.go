@@ -164,10 +164,12 @@ func (e *StorageBlobExpander) expandBlobs(ctx context.Context, currentItem *Tree
 			SourceDescription: "StorageBlobExpander request",
 		}
 	}
+	result := string(buf)
 	return ExpanderResult{
-		Response:          ExpanderResponse{Response: string(buf), ResponseType: ResponseXML},
+		Response:          ExpanderResponse{Response: result, ResponseType: ResponseXML},
 		SourceDescription: "StorageBlobExpander request",
 		Nodes:             []*TreeNode{},
+		IsPrimaryResponse: true,
 	}
 }
 
@@ -353,9 +355,13 @@ func (e *StorageBlobExpander) addAuthHeader(request *http.Request, accountName s
 	}
 	stringToSign, err := e.buildStringToSign(request, accountName)
 	if err != nil {
+		return fmt.Errorf("Failed to build string to sign: %s", err)
 		return err
 	}
-	signature := e.ComputeHMACSHA256(stringToSign, accountKey)
+	signature, err := e.ComputeHMACSHA256(stringToSign, accountKey)
+	if err != nil {
+		return fmt.Errorf("Failed to compute signature: %s", err)
+	}
 	authHeader := strings.Join([]string{"SharedKey ", accountName, ":", signature}, "")
 	request.Header[headerAuthorization] = []string{authHeader}
 	return nil
@@ -383,10 +389,14 @@ const (
 )
 
 // ComputeHMACSHA256 generates a hash signature for an HTTP request or for a SAS.
-func (e *StorageBlobExpander) ComputeHMACSHA256(message string, accountKey string) (base64String string) {
-	h := hmac.New(sha256.New, []byte(accountKey))
+func (e *StorageBlobExpander) ComputeHMACSHA256(message string, accountKey string) (string, error) {
+	bytes, err := base64.StdEncoding.DecodeString(accountKey)
+	if err != nil {
+		return "", fmt.Errorf("Failed to decode storage account key: %s", err)
+	}
+	h := hmac.New(sha256.New, bytes)
 	h.Write([]byte(message))
-	return base64.StdEncoding.EncodeToString(h.Sum(nil))
+	return base64.StdEncoding.EncodeToString(h.Sum(nil)), nil
 }
 
 func (e *StorageBlobExpander) buildStringToSign(request *http.Request, accountName string) (string, error) {
