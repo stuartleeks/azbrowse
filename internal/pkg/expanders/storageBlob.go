@@ -264,8 +264,7 @@ func (e *StorageBlobExpander) doRequest(ctx context.Context, verb string, url st
 	}
 	dateString := time.Now().UTC().Format(http.TimeFormat)
 	req.Header.Set("x-ms-date", dateString)
-	// signature := e.getAuthSignature(req, accountKey, accountAndPath)
-	// req.Header.Set("Authorization", fmt.Sprintf("SharedKeyLite %s:%s", accountName, signature))
+
 	err = e.addAuthHeader(req, accountName, accountKey)
 	if err != nil {
 		return []byte{}, fmt.Errorf("Failed to add auth header: %s", err)
@@ -290,57 +289,20 @@ func (e *StorageBlobExpander) doRequest(ctx context.Context, verb string, url st
 		return []byte{}, fmt.Errorf("Failed to read body: %s", err)
 	}
 
+	buf = e.stripBOM(buf)
+
 	return buf, nil
 }
 
-// func (e *StorageBlobExpander) getAuthSignature(req *http.Request, accountKey string, accountAndPath string) string {
-// 	verb := req.Method
-// 	dateString := req.Header.Get("x-ms-date")
-
-// 	// stringToSign := verb + "\n\n\n\n\n\n\n\n\n\n\n\nx-ms-date:" + dateString + "\nx-ms-version:2019-06-01\n" + accountAndPath
-// 	// Based on https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key#blob-queue-and-file-services-shared-key-lite-authorization
-// 	stringToSign := verb +
-// 		"\n" + // Content-MD5
-// 		"\n" + // Content-Type
-// 		"\nx-ms-date:" + dateString +
-// 		e.getCanonicalisedHeaderString(req) + // Canonicalized Headers
-// 		accountAndPath
-
-// 	h := hmac.New(sha256.New, []byte(accountKey))
-// 	h.Write([]byte(stringToSign))
-// 	return base64.StdEncoding.EncodeToString(h.Sum(nil))
-// }
-// func (e *StorageBlobExpander) getCanonicalisedHeaderString(req *http.Request) string {
-
-// 	headers := map[string]string{}
-
-// 	for k, v := range req.Header {
-// 		headerName := strings.TrimSpace(strings.ToLower(k))
-// 		if strings.HasPrefix(headerName, "x-ms-") {
-// 			headers[headerName] = v[0] // Think this is safe as the x-ms-* headers only seem to have a single value
-// 		}
-// 	}
-
-// 	if len(headers) == 0 {
-// 		return ""
-// 	}
-// 	keys := []string{}
-// 	for key := range headers {
-// 		keys = append(keys, key)
-// 	}
-
-// 	sort.Strings(keys)
-
-// 	result := ""
-// 	separator := ""
-// 	for _, key := range keys {
-// 		result += separator + key + ":" + headers[key]
-// 		separator = "\n"
-// 	}
-
-// 	return result
-// }
-
+func (e *StorageBlobExpander) stripBOM(buf []byte) []byte {
+	if len(buf) < 3 {
+		return buf
+	}
+	if buf[0] == 0xEF && buf[1] == 0xBB && buf[2] == 0xBF {
+		return buf[3:]
+	}
+	return buf
+}
 func (e *StorageBlobExpander) testCases() (bool, *[]expanderTestCase) {
 	return false, nil
 }
@@ -356,7 +318,6 @@ func (e *StorageBlobExpander) addAuthHeader(request *http.Request, accountName s
 	stringToSign, err := e.buildStringToSign(request, accountName)
 	if err != nil {
 		return fmt.Errorf("Failed to build string to sign: %s", err)
-		return err
 	}
 	signature, err := e.ComputeHMACSHA256(stringToSign, accountKey)
 	if err != nil {
