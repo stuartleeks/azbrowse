@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -30,6 +31,51 @@ func NewStorageBlobExpander(armclient *armclient.Client) *StorageBlobExpander {
 
 // Check interface
 var _ Expander = &StorageBlobExpander{}
+
+// StorageListKeyResponse is used to unmarshal a call to listKeys on a storage account
+type StorageListKeyResponse struct {
+	Keys []struct {
+		KeyName     string `json:"keyName"`
+		Value       string `json:"value"`
+		Permissions string `json:"permissions"`
+	} `json:"keys"`
+}
+
+// StorageAccountResponse is a partial representation of the storage account response
+type StorageAccountResponse struct {
+	Properties struct {
+		PrimaryEndpoints struct {
+			Blob string `json:"blob"`
+			Dfs  string `json:"dfs"`
+		} `json:"primaryEndpoints"`
+	} `json:"properties"`
+}
+
+// ContainerListResponse is a partial representation of the List container response
+type ContainerListResponse struct {
+	XMLName xml.Name `xml:"EnumerationResults"`
+	Blobs   []struct {
+		Name       string `xml:"Name"`
+		Properties struct {
+			CreationTime       string `xml:"Creation-Time"`
+			LastModified       string `xml:"Last-Modified"`
+			Etag               string `xml:"Etag"`
+			ContentLength      int    `xml:"Content-Length"`
+			ContentEncoding    string `xml:"Content-Encoding"`
+			ContentLanguage    string `xml:"Content-Language"`
+			ContentMD5         string `xml:"Content-MD5"`
+			CacheControl       string `xml:"Cache-Control"`
+			ContentDisposition string `xml:"Content-Disposition"`
+			BlobType           string `xml:"BlobType"`
+			AccessTier         string `xml:"AccessTier"`
+			AccessTierInferred string `xml:"AccessTierInferred"`
+			LeaseStatus        string `xml:"LeaseStatus"`
+			LeaseState         string `xml:"LeaseState"`
+			ServerEncrypted    string `xml:"ServerEncrypted"`
+		} `xml:"Properties"`
+	} `xml:"Blobs>Blob"`
+	NextMarker string `xml:"NextMarker"`
+}
 
 func (e *StorageBlobExpander) setClient(c *armclient.Client) {
 	e.armClient = c
@@ -71,7 +117,7 @@ func (e *StorageBlobExpander) Expand(ctx context.Context, currentItem *TreeNode)
 		newItems := []*TreeNode{}
 		newItems = append(newItems, &TreeNode{
 			Parentid:  currentItem.ID,
-			ID:        currentItem.ID + "/<repositories>",
+			ID:        currentItem.ID + "/<blobs>",
 			Namespace: "storageBlob",
 			Name:      "Blobs",
 			Display:   "Blobs",
@@ -133,7 +179,8 @@ func (e *StorageBlobExpander) Delete(ctx context.Context, currentItem *TreeNode)
 
 func (e *StorageBlobExpander) expandBlobs(ctx context.Context, currentItem *TreeNode) ExpanderResult {
 
-	// TODO cache this in the metadata
+	// https://docs.microsoft.com/en-us/rest/api/storageservices/enumerating-blob-resources#Subheading5
+
 	containerID := currentItem.Metadata["ContainerID"]
 	containerName := e.getContainerName(containerID)
 	accountName := e.getAccountName(containerID)
@@ -164,32 +211,59 @@ func (e *StorageBlobExpander) expandBlobs(ctx context.Context, currentItem *Tree
 			SourceDescription: "StorageBlobExpander request",
 		}
 	}
+
+	response := &ContainerListResponse{}
+	err = xml.Unmarshal(buf, response)
+	if err != nil {
+		return ExpanderResult{
+			Err:               fmt.Errorf("Error Unmarshalling ContainerListResponse: %s", err),
+			SourceDescription: "StorageBlobExpander request",
+		}
+	}
+	nodes := []*TreeNode{}
+
+	for _, blob := range response.Blobs {
+		node := TreeNode{
+			Parentid:  currentItem.ID,
+			Namespace: "storageBlob",
+			ID:        currentItem.ID + "/" + blob.Name,
+			Name:      blob.Name,
+			Display:   blob.Name,
+			ItemType:  "",
+			ExpandURL: ExpandURLNotSupported,
+			Metadata: map[string]string{
+				"ContainerID": currentItem.ExpandURL, // save resourceID of blob
+				"AccountName": accountName,
+				"AccountKey":  accountKey,
+			},
+		}
+		nodes = append(nodes, &node)
+	}
+	if response.NextMarker != "" {
+		node := TreeNode{
+			Parentid:  currentItem.ID,
+			Namespace: "storageBlob",
+			ID:        currentItem.ID + "/" + "...more",
+			Name:      "more... (not currently supported)",
+			Display:   "more... (not currently supported)",
+			ItemType:  "",
+			ExpandURL: ExpandURLNotSupported,
+			Metadata: map[string]string{
+				"ContainerID": currentItem.ExpandURL, // save resourceID of blob
+				"AccountName": accountName,
+				"AccountKey":  accountKey,
+			},
+		}
+		nodes = append(nodes, &node)
+	}
+
 	result := string(buf)
 	return ExpanderResult{
 		Response:          ExpanderResponse{Response: result, ResponseType: ResponseXML},
 		SourceDescription: "StorageBlobExpander request",
-		Nodes:             []*TreeNode{},
+		Nodes:             nodes,
 		IsPrimaryResponse: true,
 	}
-}
-
-// StorageListKeyResponse is used to unmarshal a call to listKeys on a storage account
-type StorageListKeyResponse struct {
-	Keys []struct {
-		KeyName     string `json:"keyName"`
-		Value       string `json:"value"`
-		Permissions string `json:"permissions"`
-	} `json:"keys"`
-}
-
-// StorageAccountResponse is a partial representation of the storage account response
-type StorageAccountResponse struct {
-	Properties struct {
-		PrimaryEndpoints struct {
-			Blob string `json:"blob"`
-			Dfs  string `json:"dfs"`
-		} `json:"primaryEndpoints`
-	} `json: "properties`
 }
 
 func (e *StorageBlobExpander) getAccountName(containerID string) string {
