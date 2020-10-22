@@ -77,6 +77,11 @@ type ContainerListResponse struct {
 	NextMarker string `xml:"NextMarker"`
 }
 
+const (
+	storageBlobNodeBlob             = "blob"
+	storageBlobNodeListBlobMetadata = "blob-continuation"
+)
+
 func (e *StorageBlobExpander) setClient(c *armclient.Client) {
 	e.armClient = c
 }
@@ -119,9 +124,9 @@ func (e *StorageBlobExpander) Expand(ctx context.Context, currentItem *TreeNode)
 			Parentid:  currentItem.ID,
 			ID:        currentItem.ID + "/<blobs>",
 			Namespace: "storageBlob",
-			Name:      "Blobs",
-			Display:   "Blobs",
-			ItemType:  SubResourceType,
+			Name:      "Blob Metadata",
+			Display:   "Blob Metadata",
+			ItemType:  storageBlobNodeListBlobMetadata,
 			ExpandURL: ExpandURLNotSupported,
 			Metadata: map[string]string{
 				"ContainerID":           currentItem.ExpandURL, // save resourceID of blob
@@ -139,22 +144,10 @@ func (e *StorageBlobExpander) Expand(ctx context.Context, currentItem *TreeNode)
 		}
 	}
 
-	if currentItem.Namespace == "storageBlob" && currentItem.ItemType == SubResourceType {
-		return e.expandBlobs(ctx, currentItem)
+	switch currentItem.ItemType {
+	case storageBlobNodeListBlobMetadata:
+		return e.expandMetadataList(ctx, currentItem)
 	}
-	// if currentItem.Namespace == "containerRegistry" && currentItem.ItemType == SubResourceType {
-	// 	return e.expandRepositories(ctx, currentItem)
-	// } else if currentItem.ItemType == "containerRegistry.repository" {
-	// 	return e.expandRepository(ctx, currentItem)
-	// } else if currentItem.ItemType == "containerRegistry.repository.tags" {
-	// 	return e.expandRepositoryTags(ctx, currentItem)
-	// } else if currentItem.ItemType == "containerRegistry.repository.tag" {
-	// 	return e.expandRepositoryTag(ctx, currentItem)
-	// } else if currentItem.ItemType == "containerRegistry.repository.manifests" {
-	// 	return e.expandRepositoryManifests(ctx, currentItem)
-	// } else if currentItem.ItemType == "containerRegistry.repository.manifest" {
-	// 	return e.expandRepositoryManifest(ctx, currentItem)
-	// }
 
 	return ExpanderResult{
 		Err:               fmt.Errorf("Error - unhandled Expand"),
@@ -177,7 +170,7 @@ func (e *StorageBlobExpander) Delete(ctx context.Context, currentItem *TreeNode)
 	return false, nil
 }
 
-func (e *StorageBlobExpander) expandBlobs(ctx context.Context, currentItem *TreeNode) ExpanderResult {
+func (e *StorageBlobExpander) expandMetadataList(ctx context.Context, currentItem *TreeNode) ExpanderResult {
 
 	// https://docs.microsoft.com/en-us/rest/api/storageservices/enumerating-blob-resources#Subheading5
 
@@ -185,6 +178,7 @@ func (e *StorageBlobExpander) expandBlobs(ctx context.Context, currentItem *Tree
 	containerName := e.getContainerName(containerID)
 	accountName := e.getAccountName(containerID)
 	accountKey, err := e.getAccountKey(ctx, containerID)
+	marker := currentItem.Metadata["Marker"]
 	if err != nil {
 		err = fmt.Errorf("Error getting account key: %s", err)
 		return ExpanderResult{
@@ -202,7 +196,10 @@ func (e *StorageBlobExpander) expandBlobs(ctx context.Context, currentItem *Tree
 	}
 
 	// ListBlob docs: https://docs.microsoft.com/en-us/rest/api/storageservices/list-blobs
-	url := blobEndpoint + containerName + "?restype=container&comp=list"
+	url := blobEndpoint + containerName + "?restype=container&comp=list&maxresults=50"
+	if marker != "" {
+		url += "&marker=" + marker
+	}
 	buf, err := e.doRequest(ctx, "GET", url, accountName, accountKey, "/"+accountName+"/"+containerName)
 
 	if err != nil {
@@ -229,10 +226,10 @@ func (e *StorageBlobExpander) expandBlobs(ctx context.Context, currentItem *Tree
 			ID:        currentItem.ID + "/" + blob.Name,
 			Name:      blob.Name,
 			Display:   blob.Name,
-			ItemType:  "",
+			ItemType:  storageBlobNodeBlob,
 			ExpandURL: ExpandURLNotSupported,
 			Metadata: map[string]string{
-				"ContainerID": currentItem.ExpandURL, // save resourceID of blob
+				"ContainerID": containerID, // save resourceID of blob
 				"AccountName": accountName,
 				"AccountKey":  accountKey,
 			},
@@ -244,14 +241,15 @@ func (e *StorageBlobExpander) expandBlobs(ctx context.Context, currentItem *Tree
 			Parentid:  currentItem.ID,
 			Namespace: "storageBlob",
 			ID:        currentItem.ID + "/" + "...more",
-			Name:      "more... (not currently supported)",
-			Display:   "more... (not currently supported)",
-			ItemType:  "",
+			Name:      "more...",
+			Display:   "more...",
+			ItemType:  storageBlobNodeListBlobMetadata,
 			ExpandURL: ExpandURLNotSupported,
 			Metadata: map[string]string{
-				"ContainerID": currentItem.ExpandURL, // save resourceID of blob
+				"ContainerID": containerID, // save resourceID of blob
 				"AccountName": accountName,
 				"AccountKey":  accountKey,
+				"Marker":      response.NextMarker,
 			},
 		}
 		nodes = append(nodes, &node)
